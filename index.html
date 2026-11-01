@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DESA BERSIH v2.1 - Smart Village Environmental System</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#16a34a',
+                            600: '#15803d',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- QRCode Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        #map { height: 450px; width: 100%; z-index: 10; }
+        .custom-badge { display: inline-flex; align-items: center; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-red { background-color: #fee2e2; color: #991b1b; }
+        .badge-yellow { background-color: #fef3c7; color: #92400e; }
+        .badge-green { background-color: #dcfce7; color: #166534; }
+        .badge-gray { background-color: #f1f5f9; color: #475569; }
+        
+        /* Scanner animation line */
+        @keyframes scanAnim {
+            0% { top: 0%; }
+            50% { top: 90%; }
+            100% { top: 0%; }
+        }
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 3px;
+            background: #16a34a;
+            box-shadow: 0 0 8px #16a34a;
+            animation: scanAnim 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-full font-sans antialiased text-slate-800 flex flex-col md:flex-row">
+
+    <!-- Mobile Top Header -->
+    <div class="md:hidden bg-brand-800 text-white p-4 flex items-center justify-between sticky top-0 z-40 shadow-md">
+        <div class="flex items-center space-x-2">
+            <i data-lucide="leaf" class="w-6 h-6 text-brand-100"></i>
+            <span class="font-bold text-lg tracking-wide">DESA BERSIH</span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="openScanModal()" class="bg-brand-600 text-xs px-2.5 py-1.5 rounded-lg flex items-center space-x-1 font-semibold text-white shadow">
+                <i data-lucide="qr-code" class="w-4 h-4"></i>
+                <span>Scan QR</span>
+            </button>
+            <div id="userProfileMobile" class="text-xs bg-brand-900 px-2 py-1 rounded border border-brand-700"></div>
+        </div>
+    </div>
+
+    <!-- Desktop Sidebar -->
+    <aside class="hidden md:flex flex-col w-64 bg-slate-900 text-slate-300 border-r border-slate-800 min-h-screen">
+        <div class="p-5 border-b border-slate-800 flex items-center space-x-3">
+            <div class="p-2 bg-brand-600 rounded-lg text-white">
+                <i data-lucide="leaf" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-white text-lg leading-none">DESA BERSIH</h1>
+                <p class="text-xs text-slate-400 mt-1">Smart Environmental System</p>
+            </div>
+        </div>
+
+        <!-- Logged User Status Card -->
+        <div id="userStatusBox" class="p-4 border-b border-slate-800 bg-slate-950/60">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span id="currentUserRoleBadge" class="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-brand-600 text-white">Petugas</span>
+                    <h4 id="currentUserName" class="text-sm font-bold text-white mt-1">Budi Santoso</h4>
+                    <p id="currentUserRW" class="text-xs text-slate-400">RW 001 / RT 001</p>
+                </div>
+                <button onclick="logoutUser()" title="Keluar / Ganti Akun" class="text-slate-400 hover:text-red-400 p-1">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-1">
+            <button onclick="openScanModal()" class="w-full flex items-center justify-center space-x-2 px-3 py-2.5 mb-3 rounded-lg text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg transition">
+                <i data-lucide="qr-code" class="w-5 h-5"></i>
+                <span>Scan Barcode Lokasi</span>
+            </button>
+
+            <button onclick="showTab('dashboard')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-brand-700 text-white">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span>Dashboard & Peta</span>
+            </button>
+            <button onclick="showTab('areas')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition">
+                <i data-lucide="map-pin" class="w-5 h-5"></i>
+                <span>Titik & QR Code Wilayah</span>
+            </button>
+            <button onclick="showTab('schedules')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
+                <span>Penjadwalan Petugas</span>
+            </button>
+            <button onclick="showTab('verification')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+                <span>Verifikasi Foto Laporan</span>
+            </button>
+            <button onclick="showTab('members')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span>Daftar Anggota Terdaftar</span>
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800 text-xs text-slate-500">
+            <p>Desa Sukamaju v2.3</p>
+            <p class="mt-0.5">Map Engine: <span class="text-brand-500 font-semibold">Google Maps Roadmap</span></p>
+        </div>
+    </aside>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 overflow-y-auto p-4 md:p-8 pb-20 md:pb-8">
+        
+        <!-- Top Banner Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+            <div>
+                <h2 id="viewTitle" class="text-2xl font-bold text-slate-900">Dashboard Utama & Peta Kebersihan</h2>
+                <p id="viewSubtitle" class="text-sm text-slate-500">Pemantauan real-time status kebersihan wilayah Desa Sukamaju.</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="openScanModal()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow transition">
+                    <i data-lucide="qr-code" class="w-4 h-4"></i>
+                    <span>Scan QR Titik</span>
+                </button>
+                <button onclick="openModalAddArea()" class="role-admin role-rt flex items-center space-x-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-sm transition">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Tambah Titik Baru</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Dynamic Content Section -->
+        <div id="contentSection">
+            
+            <!-- TAB: DASHBOARD -->
+            <div id="tab-dashboard" class="tab-content space-y-6">
+                
+                <!-- Stat Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between text-slate-500 mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider">Total Titik</span>
+                            <i data-lucide="map-pin" class="w-5 h-5 text-slate-400"></i>
+                        </div>
+                        <div id="statTotal" class="text-2xl font-black text-slate-900">12</div>
+                        <p class="text-xs text-slate-500 mt-1">Tersebar di 3 RW</p>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-red-500">
+                        <div class="flex items-center justify-between text-slate-500 mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-red-600">Belum Dibersihkan</span>
+                            <i data-lucide="alert-triangle" class="w-5 h-5 text-red-500"></i>
+                        </div>
+                        <div id="statMerah" class="text-2xl font-black text-red-600">4</div>
+                        <p class="text-xs text-slate-500 mt-1">Status Pin Merah</p>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
+                        <div class="flex items-center justify-between text-slate-500 mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-600">Sedang Dikerjakan</span>
+                            <i data-lucide="clock" class="w-5 h-5 text-amber-500"></i>
+                        </div>
+                        <div id="statKuning" class="text-2xl font-black text-amber-600">3</div>
+                        <p class="text-xs text-slate-500 mt-1">Status Pin Kuning</p>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+                        <div class="flex items-center justify-between text-slate-500 mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">Bersih & Diverifikasi</span>
+                            <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-500"></i>
+                        </div>
+                        <div id="statHijau" class="text-2xl font-black text-emerald-600">5</div>
+                        <p class="text-xs text-slate-500 mt-1">Status Pin Hijau</p>
+                    </div>
+                </div>
+
+                <!-- Cleanliness Score Progress Bar -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-2">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-base">Skor Indeks Kebersihan Desa Sukamaju</h3>
+                            <p class="text-xs text-slate-500">Rasio wilayah bersih terverifikasi dibandingkan total titik kebersihan.</p>
+                        </div>
+                        <span id="scorePercentText" class="text-2xl font-black text-brand-700">41.6%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-4 overflow-hidden p-0.5 border border-slate-200">
+                        <div id="scoreProgressBar" class="bg-brand-600 h-full rounded-full transition-all duration-500" style="width: 41.6%"></div>
+                    </div>
+                </div>
+
+                <!-- Interactive Map Component -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="map" class="w-5 h-5 text-slate-600"></i>
+                            <h3 class="font-bold text-slate-900">Peta Digital Wilayah Kebersihan</h3>
+                        </div>
+                        
+                        <!-- Filter Controls -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select id="filterRW" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1.5 focus:outline-none">
+                                <option value="ALL">Semua RW</option>
+                                <option value="RW 001">RW 001</option>
+                                <option value="RW 002">RW 002</option>
+                                <option value="RW 003">RW 003</option>
+                            </select>
+
+                            <select id="filterStatus" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1.5 focus:outline-none">
+                                <option value="ALL">Semua Status</option>
+                                <option value="merah">Merah (Belum)</option>
+                                <option value="kuning">Kuning (Sedang)</option>
+                                <option value="hijau">Hijau (Selesai)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Map Container -->
+                    <div class="rounded-lg overflow-hidden border border-slate-200">
+                        <div id="map"></div>
+                    </div>
+
+                    <!-- Map Legend -->
+                    <div class="flex flex-wrap items-center justify-center gap-6 pt-2 text-xs text-slate-600">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full bg-red-600 inline-block"></span>
+                            <span>Merah: Belum Dibersihkan</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                            <span>Kuning: Sedang Dikerjakan</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full bg-emerald-600 inline-block"></span>
+                            <span>Hijau: Verified & Clean</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Priority Locations Table -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                        <h3 class="font-bold text-slate-900 text-base">Daftar Titik Area Prioritas</h3>
+                        <span class="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-semibold">Perlu Tindakan Immediate</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+                                <tr>
+                                    <th class="p-4">Kode Barcode</th>
+                                    <th class="p-4">Nama Lokasi</th>
+                                    <th class="p-4">Wilayah</th>
+                                    <th class="p-4">Kategori</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4 text-right">Aksi Scan / Input</th>
+                                </tr>
+                            </thead>
+                            <tbody id="areaTableBody" class="divide-y divide-slate-100">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- TAB: TITIK KEBERSIHAN & QR CODE WILAYAH -->
+            <div id="tab-areas" class="tab-content hidden space-y-4">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-lg">Kelola Titik Kebersihan & QR Code Wilayah</h3>
+                            <p class="text-sm text-slate-500">Setiap titik lokasi memiliki QR Code/Barcode unik yang dapat dicetak dan dipasang di lokasi fisik.</p>
+                        </div>
+                        <button onclick="openModalAddArea()" class="bg-brand-600 text-white text-xs px-3 py-2 rounded-lg font-semibold">
+                            + Tambah Lokasi Baru
+                        </button>
+                    </div>
+                    <div id="fullAreaList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: PENJADWALAN PETUGAS -->
+            <div id="tab-schedules" class="tab-content hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-lg">Sistem Penjadwalan Petugas</h3>
+                            <p class="text-sm text-slate-500">Pengaturan penugasan tim pembersihan secara otomatis maupun manual.</p>
+                        </div>
+                        <button onclick="runAutoScheduler()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold flex items-center space-x-2 shadow-sm">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            <span>Jalankan Auto-Scheduler Engine</span>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="text-xs text-slate-500 font-bold uppercase">Tim A (RW 001 - RT 001)</div>
+                            <div class="text-lg font-bold text-slate-800 mt-1">4 Petugas Active</div>
+                            <div class="text-xs text-emerald-600 mt-1">Capacity: 2/4 Task Assigned</div>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="text-xs text-slate-500 font-bold uppercase">Tim B (RW 002 - RT 002)</div>
+                            <div class="text-lg font-bold text-slate-800 mt-1">3 Petugas Active</div>
+                            <div class="text-xs text-emerald-600 mt-1">Capacity: 1/3 Task Assigned</div>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="text-xs text-slate-500 font-bold uppercase">Tim C (RW 003)</div>
+                            <div class="text-lg font-bold text-slate-800 mt-1">5 Petugas Active</div>
+                            <div class="text-xs text-amber-600 mt-1">Capacity: Fully Loaded</div>
+                        </div>
+                    </div>
+
+                    <h4 class="font-bold text-slate-900 text-sm mb-3">Jadwal Tugas Aktif Hari Ini</h4>
+                    <div id="scheduleList" class="space-y-3">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: VERIFIKASI FOTO LAPORAN -->
+            <div id="tab-verification" class="tab-content hidden space-y-4">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-900 text-lg mb-1">Verifikasi Bukti Foto Sebelum & Sesudah</h3>
+                    <p class="text-sm text-slate-500 mb-6">Peninjauan foto kondisi Sebelum vs Sesudah yang diunggah anggota/petugas setelah melakukan scan QR Code lokasi.</p>
+                    
+                    <div id="verificationCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: DAFTAR ANGGOTA TERDAFTAR -->
+            <div id="tab-members" class="tab-content hidden space-y-4">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-lg">Daftar Anggota & Petugas Terdaftar</h3>
+                            <p class="text-sm text-slate-500">Anggota wajib mendaftarkan akun untuk melakukan scan QR lokasi dan mengunggah laporan kebersihan.</p>
+                        </div>
+                        <button onclick="openModalRegister()" class="bg-brand-600 hover:bg-brand-700 text-white text-xs px-3.5 py-2 rounded-lg font-bold">
+                            + Daftarkan Anggota Baru
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+                                <tr>
+                                    <th class="p-3">Nama Anggota</th>
+                                    <th class="p-3">NIK / ID Petugas</th>
+                                    <th class="p-3">No. WhatsApp</th>
+                                    <th class="p-3">Wilayah Tugas</th>
+                                    <th class="p-3">Hak Akses / Role</th>
+                                    <th class="p-3 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="memberTableBody" class="divide-y divide-slate-100">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-slate-400 flex justify-around p-2 z-40">
+        <button onclick="showTab('dashboard')" class="flex flex-col items-center text-xs py-1 text-brand-400">
+            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+            <span class="mt-0.5">Peta</span>
+        </button>
+        <button onclick="showTab('areas')" class="flex flex-col items-center text-xs py-1 hover:text-white">
+            <i data-lucide="map-pin" class="w-5 h-5"></i>
+            <span class="mt-0.5">QR Titik</span>
+        </button>
+        <button onclick="showTab('schedules')" class="flex flex-col items-center text-xs py-1 hover:text-white">
+            <i data-lucide="calendar" class="w-5 h-5"></i>
+            <span class="mt-0.5">Jadwal</span>
+        </button>
+        <button onclick="showTab('verification')" class="flex flex-col items-center text-xs py-1 hover:text-white">
+            <i data-lucide="check-circle" class="w-5 h-5"></i>
+            <span class="mt-0.5">Verifikasi</span>
+        </button>
+        <button onclick="showTab('members')" class="flex flex-col items-center text-xs py-1 hover:text-white">
+            <i data-lucide="users" class="w-5 h-5"></i>
+            <span class="mt-0.5">Anggota</span>
+        </button>
+    </div>
+
+    <!-- MODAL: DAFTAR AKUN ANGGOTA -->
+    <div id="modalRegister" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div class="p-5 bg-brand-800 text-white flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="user-plus" class="w-5 h-5 text-brand-100"></i>
+                    <h3 class="font-bold text-base">Pendaftaran Akun Anggota</h3>
+                </div>
+                <button onclick="closeModalRegister()" class="text-slate-300 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="handleRegister(event)" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nama Lengkap</label>
+                    <input type="text" id="regName" required placeholder="Contoh: Budi Santoso" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">NIK / ID Petugas</label>
+                        <input type="text" id="regID" required placeholder="321601230490001" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">No. WhatsApp</label>
+                        <input type="tel" id="regPhone" required placeholder="081234567890" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Wilayah RW</label>
+                        <select id="regRW" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="RW 001">RW 001</option>
+                            <option value="RW 002">RW 002</option>
+                            <option value="RW 003">RW 003</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Wilayah RT</label>
+                        <select id="regRT" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="RT 001">RT 001</option>
+                            <option value="RT 002">RT 002</option>
+                            <option value="RT 003">RT 003</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Peran / Role Akses</label>
+                    <select id="regRole" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="petugas">Petugas Kebersihan / Anggota Lapangan</option>
+                        <option value="rt">Ketua RT</option>
+                        <option value="rw">Ketua RW</option>
+                        <option value="koordinator">Koordinator Tim Kebersihan</option>
+                        <option value="admin">Admin Desa</option>
+                    </select>
+                </div>
+                <div class="pt-3 flex justify-end space-x-3 border-t border-slate-100">
+                    <button type="button" onclick="closeModalRegister()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 font-semibold">Batal</button>
+                    <button type="submit" class="px-5 py-2 rounded-lg text-sm bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md">Daftarkan Akun</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT AKUN ANGGOTA (NEW V2.3) -->
+    <div id="modalEditMember" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div class="p-5 bg-slate-900 text-white flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="user-cog" class="w-5 h-5 text-emerald-400"></i>
+                    <h3 class="font-bold text-base">Edit Data Anggota</h3>
+                </div>
+                <button onclick="closeModalEditMember()" class="text-slate-300 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="handleEditMember(event)" class="p-5 space-y-4">
+                <input type="hidden" id="editMemberId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nama Lengkap</label>
+                    <input type="text" id="editName" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">NIK / ID Petugas</label>
+                        <input type="text" id="editID" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">No. WhatsApp</label>
+                        <input type="tel" id="editPhone" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Wilayah RW</label>
+                        <select id="editRW" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="RW 001">RW 001</option>
+                            <option value="RW 002">RW 002</option>
+                            <option value="RW 003">RW 003</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Wilayah RT</label>
+                        <select id="editRT" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="RT 001">RT 001</option>
+                            <option value="RT 002">RT 002</option>
+                            <option value="RT 003">RT 003</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Peran / Role Akses</label>
+                    <select id="editRole" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="petugas">Petugas Kebersihan / Anggota Lapangan</option>
+                        <option value="rt">Ketua RT</option>
+                        <option value="rw">Ketua RW</option>
+                        <option value="koordinator">Koordinator Tim Kebersihan</option>
+                        <option value="admin">Admin Desa</option>
+                    </select>
+                </div>
+                <div class="pt-3 flex justify-end space-x-3 border-t border-slate-100">
+                    <button type="button" onclick="closeModalEditMember()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 font-semibold">Batal</button>
+                    <button type="submit" class="px-5 py-2 rounded-lg text-sm bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: SCAN BARCODE / QR CODE -->
+    <div id="modalScan" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="qr-code" class="w-5 h-5 text-emerald-400"></i>
+                    <h3 class="font-bold text-base">Scanner QR Code Kebersihan</h3>
+                </div>
+                <button onclick="closeScanModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 text-center space-y-4">
+                <!-- Camera Viewport Simulation -->
+                <div class="relative w-64 h-64 mx-auto bg-slate-950 rounded-xl overflow-hidden border-2 border-emerald-500 flex items-center justify-center shadow-inner">
+                    <div class="scan-line"></div>
+                    <div class="text-slate-400 text-xs px-4 z-10 pointer-events-none">
+                        <i data-lucide="camera" class="w-10 h-10 mx-auto mb-2 text-emerald-400 animate-pulse"></i>
+                        Arahkan kamera smartphone ke QR Code yang terpasang di lokasi fisik titik kebersihan
+                    </div>
+                </div>
+
+                <!-- Manual Dropdown Simulator for Testing/Desktop -->
+                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-left">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Simulasi Pilih QR Code Ter-Scan:</label>
+                    <select id="simulatedQRSelect" class="w-full text-xs border border-slate-300 rounded p-2 bg-white">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <div class="flex space-x-2">
+                    <button onclick="closeScanModal()" class="flex-1 py-2 rounded-lg text-xs font-semibold bg-slate-200 hover:bg-slate-300 text-slate-700">Tutup</button>
+                    <button onclick="processSimulatedScan()" class="flex-1 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md">
+                        Konfirmasi Scan QR
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: TAMPILKAN / CETAK QR CODE BARCODE TITIK -->
+    <div id="modalShowQR" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 text-center">
+            <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-sm">QR Code Fisik Lokasi</h3>
+                <button onclick="closeModalShowQR()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <h4 id="qrModalTitle" class="font-bold text-slate-900 text-base">TPS Liar Dusun I</h4>
+                    <p id="qrModalSub" class="text-xs text-slate-500">RW 001 / RT 001</p>
+                    <span id="qrModalCode" class="inline-block font-mono text-xs font-bold bg-slate-100 text-slate-800 px-3 py-1 rounded-md border mt-2">QR-DESA-001</span>
+                </div>
+
+                <!-- QR Code Box -->
+                <div class="bg-white p-4 border border-slate-300 rounded-xl inline-block shadow-sm">
+                    <div id="qrcodeCanvas" class="flex justify-center items-center"></div>
+                </div>
+
+                <p class="text-xs text-slate-500 italic">Cetak QR Code ini dan pasang pada tiang/papan petunjuk lokasi fisik agar anggota dapat melakukan scan saat tiba di lokasi.</p>
+
+                <div class="flex space-x-2 pt-2">
+                    <button onclick="window.print()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white text-xs py-2 rounded-lg font-bold flex items-center justify-center space-x-1">
+                        <i data-lucide="printer" class="w-4 h-4"></i>
+                        <span>Cetak QR Code</span>
+                    </button>
+                    <button onclick="closeModalShowQR()" class="flex-1 bg-slate-200 text-slate-700 text-xs py-2 rounded-lg font-semibold">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: UNGGAH FOTO SEBELUM & SESUDAH PEMBERSIHAN -->
+    <div id="modalUploadReport" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 my-8">
+            <div class="p-4 bg-brand-800 text-white flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="camera" class="w-5 h-5 text-brand-100"></i>
+                    <h3 class="font-bold text-base">Upload Foto Pembersihan</h3>
+                </div>
+                <button onclick="closeModalUploadReport()" class="text-slate-300 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleUploadReport(event)" class="p-5 space-y-4">
+                <input type="hidden" id="reportAreaId">
+                <div class="bg-brand-50 p-3 rounded-lg border border-brand-200">
+                    <h4 id="reportAreaName" class="font-bold text-brand-900 text-sm">TPS Liar Dusun I</h4>
+                    <p id="reportAreaLocation" class="text-xs text-brand-700">Wilayah: RW 001 / RT 001</p>
+                    <p class="text-xs text-slate-600 mt-1">Petugas Pelapor: <b id="reportUserIdentity">Budi Santoso (NIK: 321601230490001)</b></p>
+                </div>
+
+                <!-- Input Foto Sebelum -->
+                <div class="p-3 border border-slate-200 rounded-lg bg-slate-50 space-y-2">
+                    <label class="block text-xs font-bold text-slate-800 uppercase flex items-center justify-between">
+                        <span>1. Foto Kondisi SEBELUM Dibersihkan</span>
+                        <span class="text-red-500 text-[10px]">*Wajib</span>
+                    </label>
+                    <div class="flex flex-col space-y-2">
+                        <input type="file" id="fileBefore" accept="image/*" capture="environment" onchange="previewImage(this, 'previewBefore')" class="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-100 file:text-brand-800 cursor-pointer">
+                        <p class="text-[11px] text-slate-500">Atau pilih dari galeri HP/Laptop Anda.</p>
+                    </div>
+                    <div id="previewBeforeBox" class="mt-2 hidden">
+                        <img id="previewBefore" src="" alt="Preview Sebelum" class="w-full h-40 object-cover rounded-lg border border-slate-300 shadow-sm">
+                    </div>
+                </div>
+
+                <!-- Input Foto Sesudah -->
+                <div class="p-3 border border-slate-200 rounded-lg bg-slate-50 space-y-2">
+                    <label class="block text-xs font-bold text-slate-800 uppercase flex items-center justify-between">
+                        <span>2. Foto Kondisi SESUDAH Dibersihkan</span>
+                        <span class="text-emerald-600 text-[10px]">*Wajib (Jika Selesai)</span>
+                    </label>
+                    <div class="flex flex-col space-y-2">
+                        <input type="file" id="fileAfter" accept="image/*" capture="environment" onchange="previewImage(this, 'previewAfter')" class="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-100 file:text-brand-800 cursor-pointer">
+                        <p class="text-[11px] text-slate-500">Unggah bukti kondisi area yang sudah bersih rapi.</p>
+                    </div>
+                    <div id="previewAfterBox" class="mt-2 hidden">
+                        <img id="previewAfter" src="" alt="Preview Sesudah" class="w-full h-40 object-cover rounded-lg border border-slate-300 shadow-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Catatan / Keterangan Pembersihan</label>
+                    <textarea id="reportNotes" rows="2" placeholder="Catatan kondisi lokasi, perkiraan volume sampah diangkut, atau kendala..." class="w-full text-xs border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+                </div>
+
+                <div class="pt-3 flex justify-end space-x-3 border-t border-slate-100">
+                    <button type="button" onclick="closeModalUploadReport()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 font-semibold">Batal</button>
+                    <button type="submit" class="px-5 py-2 rounded-lg text-sm bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md">Simpan & Kirim Laporan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: TAMBAH TITIK KEBERSIHAN BARU -->
+    <div id="modalAddArea" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-200">
+            <div class="p-5 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-base">Tambah Titik Lokasi Kebersihan Baru</h3>
+                <button onclick="closeModalAddArea()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="handleFormAddArea(event)" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nama Lokasi</label>
+                    <input type="text" id="inputName" required placeholder="Contoh: Selokan Utama RT 002" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Wilayah RW</label>
+                        <select id="inputRW" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="RW 001">RW 001</option>
+                            <option value="RW 002">RW 002</option>
+                            <option value="RW 003">RW 003</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Wilayah RT</label>
+                        <select id="inputRT" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="RT 001">RT 001</option>
+                            <option value="RT 002">RT 002</option>
+                            <option value="RT 003">RT 003</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Kategori Area</label>
+                        <select id="inputCategory" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="Selokan & Saluran Air">Selokan & Saluran Air</option>
+                            <option value="Tempat Pembuangan Sampah">Tempat Pembuangan Sampah</option>
+                            <option value="Jalan Lingkungan">Jalan Lingkungan</option>
+                            <option value="Lapangan & Fasum">Lapangan & Fasum</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tingkat Prioritas</label>
+                        <select id="inputPriority" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="darurat">Darurat</option>
+                            <option value="tinggi">Tinggi</option>
+                            <option value="sedang" selected>Sedang</option>
+                            <option value="rendah">Rendah</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Latitude GPS</label>
+                        <input type="number" step="any" id="inputLat" required value="-6.2550" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Longitude GPS</label>
+                        <input type="number" step="any" id="inputLng" required value="107.1550" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Deskripsi Kondisi</label>
+                    <textarea id="inputDesc" rows="2" placeholder="Sampah menumpuk membendung arus selokan..." class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:outline-none"></textarea>
+                </div>
+
+                <div class="pt-3 flex justify-end space-x-3 border-t border-slate-100">
+                    <button type="button" onclick="closeModalAddArea()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 font-semibold">Batal</button>
+                    <button type="submit" class="px-5 py-2 rounded-lg text-sm bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md">Simpan Titik Area</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC WITH LOCALSTORAGE PERSISTENCE -->
+    <script>
+        // Initial Default Members Data
+        const defaultMembers = [
+            { id: 1, name: "Budi Santoso", nik: "321601230490001", phone: "081234567890", rw: "RW 001", rt: "RT 001", role: "petugas" },
+            { id: 2, name: "Pak Slamet", nik: "321601250885002", phone: "085698765432", rw: "RW 001", rt: "RT 001", role: "rt" },
+            { id: 3, name: "H. Ahmad", nik: "321601120275003", phone: "081311223344", rw: "RW 001", rt: "RT 002", role: "rw" },
+            { id: 4, name: "Dedi Kurniawan", nik: "321601150692004", phone: "087788990011", rw: "RW 002", rt: "RT 001", role: "koordinator" },
+            { id: 5, name: "Admin Kelurahan", nik: "321601010199000", phone: "081100001111", rw: "RW 001", rt: "RT 001", role: "admin" }
+        ];
+
+        // Initial Default Cleaning Areas Data
+        const defaultCleaningAreas = [
+            { 
+                id: 1, 
+                qrCode: "QR-DESA-001",
+                name: "TPS Liar Dusun I", 
+                rw: "RW 001", 
+                rt: "RT 001", 
+                category: "Tempat Pembuangan Sampah", 
+                priority: "darurat", 
+                status: "merah", 
+                lat: -6.2512, 
+                lng: 107.1510, 
+                desc: "Tumpukan limbah rumah tangga liar meluap ke badan jalan.",
+                imgBefore: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=400&q=80",
+                imgAfter: "",
+                reportedBy: ""
+            },
+            { 
+                id: 2, 
+                qrCode: "QR-DESA-002",
+                name: "Drainase Jl. Merdeka", 
+                rw: "RW 001", 
+                rt: "RT 002", 
+                category: "Selokan & Saluran Air", 
+                priority: "tinggi", 
+                status: "merah", 
+                lat: -6.2530, 
+                lng: 107.1535, 
+                desc: "Endapan lumpur tebal menyumbat gorong-gorong.",
+                imgBefore: "https://images.unsplash.com/photo-1621451537084-482c73073a0f?auto=format&fit=crop&w=400&q=80",
+                imgAfter: "",
+                reportedBy: ""
+            },
+            { 
+                id: 3, 
+                qrCode: "QR-DESA-003",
+                name: "Lapangan Serbaguna RT 03", 
+                rw: "RW 001", 
+                rt: "RT 003", 
+                category: "Lapangan & Fasum", 
+                priority: "sedang", 
+                status: "kuning", 
+                lat: -6.2545, 
+                lng: 107.1502, 
+                desc: "Rumput liar tinggi dan sampah bekas acara warga.",
+                imgBefore: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=400&q=80",
+                imgAfter: "https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&w=400&q=80",
+                reportedBy: "Budi Santoso"
+            },
+            { 
+                id: 4, 
+                qrCode: "QR-DESA-004",
+                name: "Saluran Utama Blok B", 
+                rw: "RW 002", 
+                rt: "RT 001", 
+                category: "Selokan & Saluran Air", 
+                priority: "tinggi", 
+                status: "merah", 
+                lat: -6.2560, 
+                lng: 107.1570, 
+                desc: "Sampah plastik menumpuk di jembatan penghubung.",
+                imgBefore: "",
+                imgAfter: "",
+                reportedBy: ""
+            },
+            { 
+                id: 5, 
+                qrCode: "QR-DESA-005",
+                name: "Jalan Lingkungan RT 02", 
+                rw: "RW 002", 
+                rt: "RT 002", 
+                category: "Jalan Lingkungan", 
+                priority: "rendah", 
+                status: "hijau", 
+                lat: -6.2580, 
+                lng: 107.1555, 
+                desc: "Sudah disapu dan dipilah oleh Tim B.",
+                imgBefore: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=400&q=80",
+                imgAfter: "https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&w=400&q=80",
+                reportedBy: "Dedi Kurniawan"
+            },
+            { 
+                id: 6, 
+                qrCode: "QR-DESA-006",
+                name: "Taman Pembibitan Desa", 
+                rw: "RW 003", 
+                rt: "RT 001", 
+                category: "Lapangan & Fasum", 
+                priority: "sedang", 
+                status: "hijau", 
+                lat: -6.2595, 
+                lng: 107.1590, 
+                desc: "Pembersihan rutin selesai dan terverifikasi.",
+                imgBefore: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=400&q=80",
+                imgAfter: "https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&w=400&q=80",
+                reportedBy: "Budi Santoso"
+            }
+        ];
+
+        // Load state from localStorage or use defaults
+        let membersList = JSON.parse(localStorage.getItem('desa_members')) || defaultMembers;
+        let cleaningAreas = JSON.parse(localStorage.getItem('desa_areas')) || defaultCleaningAreas;
+        let currentUser = membersList[0];
+
+        function saveData() {
+            try {
+                localStorage.setItem('desa_members', JSON.stringify(membersList));
+                localStorage.setItem('desa_areas', JSON.stringify(cleaningAreas));
+            } catch (e) {
+                console.warn('LocalStorage limit reached or disabled:', e);
+            }
+        }
+
+        let map, markersGroup;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            updateUserUI();
+            initMap();
+            renderDashboard();
+            renderScheduleTab();
+            renderVerificationTab();
+            renderMemberTab();
+            populateQRScanDropdown();
+        });
+
+        function updateUserUI() {
+            document.getElementById('currentUserName').innerText = currentUser.name;
+            document.getElementById('currentUserRW').innerText = `${currentUser.rw} / ${currentUser.rt}`;
+            document.getElementById('currentUserRoleBadge').innerText = currentUser.role.toUpperCase();
+            document.getElementById('userProfileMobile').innerHTML = `<b>${currentUser.name}</b> (${currentUser.role})`;
+        }
+
+        function initMap() {
+            map = L.map('map').setView([-6.2545, 107.1550], 15);
+
+            // MENGGUNAKAN GOOGLE MAPS TILE LAYER (100% BEBAS ACCESS BLOCKED / 403)
+            L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '&copy; Google Maps | DESA BERSIH'
+            }).addTo(map);
+
+            markersGroup = L.layerGroup().addTo(map);
+            renderMapMarkers(cleaningAreas);
+        }
+
+        function getMarkerColor(status) {
+            switch(status) {
+                case 'merah': return '#dc2626';
+                case 'kuning': return '#f59e0b';
+                case 'hijau': return '#16a34a';
+                default: return '#64748b';
+            }
+        }
+
+        function renderMapMarkers(data) {
+            markersGroup.clearLayers();
+            data.forEach(item => {
+                const color = getMarkerColor(item.status);
+                const customIcon = L.divIcon({
+                    className: 'custom-pin',
+                    html: `<div style="background-color: ${color}; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></div>`,
+                    iconSize: [18, 18],
+                    iconAnchor: [9, 9]
+                });
+
+                const marker = L.marker([item.lat, item.lng], { icon: customIcon });
+                marker.bindPopup(`
+                    <div class="p-1 font-sans">
+                        <span class="custom-badge badge-${item.status} mb-1">${item.status.toUpperCase()}</span>
+                        <h4 class="font-bold text-slate-900 text-sm mb-0.5">${item.name}</h4>
+                        <p class="text-[10px] text-slate-500 font-mono mb-1">Kode: <b>${item.qrCode}</b></p>
+                        <p class="text-xs text-slate-600 mb-1"><b>Wilayah:</b> ${item.rw} / ${item.rt}</p>
+                        <p class="text-xs text-slate-500 mb-2">${item.desc}</p>
+                        <div class="flex space-x-1">
+                            <button onclick="openModalShowQR(${item.id})" class="flex-1 bg-slate-800 text-white text-xs py-1 px-1 rounded font-semibold">Lihat QR</button>
+                            <button onclick="openUploadModalForId(${item.id})" class="flex-1 bg-brand-600 text-white text-xs py-1 px-1 rounded font-semibold">Upload Foto</button>
+                        </div>
+                    </div>
+                `);
+                markersGroup.addLayer(marker);
+            });
+        }
+
+        function renderDashboard() {
+            const total = cleaningAreas.length;
+            const merah = cleaningAreas.filter(a => a.status === 'merah').length;
+            const kuning = cleaningAreas.filter(a => a.status === 'kuning').length;
+            const hijau = cleaningAreas.filter(a => a.status === 'hijau').length;
+            const score = total > 0 ? ((hijau / total) * 100).toFixed(1) : 0;
+
+            document.getElementById('statTotal').innerText = total;
+            document.getElementById('statMerah').innerText = merah;
+            document.getElementById('statKuning').innerText = kuning;
+            document.getElementById('statHijau').innerText = hijau;
+            document.getElementById('scorePercentText').innerText = `${score}%`;
+            document.getElementById('scoreProgressBar').style.width = `${score}%`;
+
+            // Render Priority Table
+            const tbody = document.getElementById('areaTableBody');
+            tbody.innerHTML = '';
+
+            cleaningAreas.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="p-4 font-mono font-bold text-xs text-brand-700">${item.qrCode}</td>
+                    <td class="p-4 font-bold text-slate-900">${item.name}</td>
+                    <td class="p-4 text-xs">${item.rw} / ${item.rt}</td>
+                    <td class="p-4 text-xs">${item.category}</td>
+                    <td class="p-4"><span class="custom-badge badge-${item.status}">${item.status.toUpperCase()}</span></td>
+                    <td class="p-4 text-right space-x-1">
+                        <button onclick="openModalShowQR(${item.id})" title="Cetak QR Code" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold px-2 py-1 rounded">
+                            <i data-lucide="qr-code" class="w-3.5 h-3.5 inline"></i> QR
+                        </button>
+                        <button onclick="openUploadModalForId(${item.id})" class="text-xs bg-brand-600 hover:bg-brand-700 text-white font-semibold px-2.5 py-1 rounded">
+                            Upload Foto
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+
+            // Render Full Area Cards List
+            const fullList = document.getElementById('fullAreaList');
+            fullList.innerHTML = '';
+            cleaningAreas.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "p-4 border border-slate-200 rounded-xl flex flex-col justify-between bg-slate-50 space-y-3";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="custom-badge badge-${item.status}">${item.status.toUpperCase()}</span>
+                            <span class="font-mono text-xs font-bold bg-white text-slate-700 border px-2 py-0.5 rounded">${item.qrCode}</span>
+                        </div>
+                        <h4 class="font-bold text-slate-900 text-base">${item.name}</h4>
+                        <p class="text-xs text-slate-500 mt-0.5">${item.rw} - ${item.rt} (${item.category})</p>
+                        <p class="text-xs text-slate-600 mt-2">${item.desc}</p>
+                    </div>
+                    <div class="pt-2 border-t border-slate-200 flex justify-between items-center">
+                        <button onclick="openModalShowQR(${item.id})" class="text-xs bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded font-semibold flex items-center space-x-1">
+                            <i data-lucide="qr-code" class="w-4 h-4"></i>
+                            <span>Barcode QR</span>
+                        </button>
+                        <button onclick="openUploadModalForId(${item.id})" class="text-xs bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded font-semibold">
+                            Upload Foto Pembersihan
+                        </button>
+                    </div>
+                `;
+                fullList.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // --- SCANNER LOGIC ---
+        function openScanModal() {
+            populateQRScanDropdown();
+            document.getElementById('modalScan').classList.remove('hidden');
+        }
+
+        function closeScanModal() {
+            document.getElementById('modalScan').classList.add('hidden');
+        }
+
+        function populateQRScanDropdown() {
+            const select = document.getElementById('simulatedQRSelect');
+            select.innerHTML = '';
+            cleaningAreas.forEach(area => {
+                const opt = document.createElement('option');
+                opt.value = area.id;
+                opt.innerText = `[${area.qrCode}] ${area.name} (${area.rw})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function processSimulatedScan() {
+            const areaId = parseInt(document.getElementById('simulatedQRSelect').value);
+            closeScanModal();
+            openUploadModalForId(areaId);
+        }
+
+        // --- SHOW / PRINT QR CODE ---
+        function openModalShowQR(id) {
+            const item = cleaningAreas.find(a => a.id === id);
+            if (!item) return;
+
+            document.getElementById('qrModalTitle').innerText = item.name;
+            document.getElementById('qrModalSub').innerText = `${item.rw} / ${item.rt} - Kategori: ${item.category}`;
+            document.getElementById('qrModalCode').innerText = item.qrCode;
+
+            const qrContainer = document.getElementById('qrcodeCanvas');
+            qrContainer.innerHTML = '';
+
+            new QRCode(qrContainer, {
+                text: `DESABERSIH-POINT:${item.qrCode}:${item.id}`,
+                width: 140,
+                height: 140,
+                colorDark: "#15803d",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            document.getElementById('modalShowQR').classList.remove('hidden');
+        }
+
+        function closeModalShowQR() {
+            document.getElementById('modalShowQR').classList.add('hidden');
+        }
+
+        // --- UPLOAD REPORT & PHOTOS ---
+        function openUploadModalForId(id) {
+            const item = cleaningAreas.find(a => a.id === id);
+            if (!item) return;
+
+            document.getElementById('reportAreaId').value = item.id;
+            document.getElementById('reportAreaName').innerText = `[${item.qrCode}] ${item.name}`;
+            document.getElementById('reportAreaLocation').innerText = `Wilayah: ${item.rw} / ${item.rt} | Status Saat Ini: ${item.status.toUpperCase()}`;
+            document.getElementById('reportUserIdentity').innerText = `${currentUser.name} (${currentUser.nik})`;
+
+            // Load existing previews if available
+            if (item.imgBefore) {
+                document.getElementById('previewBefore').src = item.imgBefore;
+                document.getElementById('previewBeforeBox').classList.remove('hidden');
+            } else {
+                document.getElementById('previewBeforeBox').classList.add('hidden');
+                document.getElementById('previewBefore').src = '';
+            }
+
+            if (item.imgAfter) {
+                document.getElementById('previewAfter').src = item.imgAfter;
+                document.getElementById('previewAfterBox').classList.remove('hidden');
+            } else {
+                document.getElementById('previewAfterBox').classList.add('hidden');
+                document.getElementById('previewAfter').src = '';
+            }
+
+            document.getElementById('fileBefore').value = '';
+            document.getElementById('fileAfter').value = '';
+            document.getElementById('reportNotes').value = item.desc || '';
+
+            document.getElementById('modalUploadReport').classList.remove('hidden');
+        }
+
+        function closeModalUploadReport() {
+            document.getElementById('modalUploadReport').classList.add('hidden');
+        }
+
+        function previewImage(input, previewId) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById(previewId);
+                    img.src = e.target.result;
+                    document.getElementById(previewId + 'Box').classList.remove('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function handleUploadReport(e) {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('reportAreaId').value);
+            const item = cleaningAreas.find(a => a.id === id);
+
+            if (!item) return;
+
+            const beforeSrc = document.getElementById('previewBefore').src;
+            const afterSrc = document.getElementById('previewAfter').src;
+            const notes = document.getElementById('reportNotes').value;
+
+            if (beforeSrc && beforeSrc !== '' && !beforeSrc.endsWith('#')) {
+                item.imgBefore = beforeSrc;
+            }
+            if (afterSrc && afterSrc !== '' && !afterSrc.endsWith('#')) {
+                item.imgAfter = afterSrc;
+            }
+
+            if (notes) {
+                item.desc = notes;
+            }
+
+            // Update status dynamically
+            if (item.imgBefore && item.imgAfter) {
+                item.status = 'kuning'; // Submitted & waiting for RT/RW verification
+            } else if (item.imgBefore) {
+                item.status = 'kuning';
+            }
+
+            item.reportedBy = currentUser.name;
+
+            saveData();
+            renderDashboard();
+            renderMapMarkers(cleaningAreas);
+            renderVerificationTab();
+            closeModalUploadReport();
+
+            alert(`Laporan foto kebersihan [${item.name}] berhasil dikirim!\n\nStatus area diperbarui menjadi KUNING (Menunggu Verifikasi Pembuktian oleh RT/RW).`);
+        }
+
+        // --- MEMBER REGISTRATION LOGIC ---
+        function openModalRegister() {
+            document.getElementById('modalRegister').classList.remove('hidden');
+        }
+
+        function closeModalRegister() {
+            document.getElementById('modalRegister').classList.add('hidden');
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
+            const newMember = {
+                id: Date.now(),
+                name: document.getElementById('regName').value,
+                nik: document.getElementById('regID').value,
+                phone: document.getElementById('regPhone').value,
+                rw: document.getElementById('regRW').value,
+                rt: document.getElementById('regRT').value,
+                role: document.getElementById('regRole').value
+            };
+
+            membersList.push(newMember);
+            currentUser = newMember;
+            saveData();
+            updateUserUI();
+            renderMemberTab();
+            closeModalRegister();
+
+            alert(`Akun Anggota Berhasil Terdaftar!\nSelamat datang, ${newMember.name}. Anda sekarang dapat melakukan scan QR Code lokasi.`);
+        }
+
+        function logoutUser() {
+            openModalRegister();
+        }
+
+        function renderMemberTab() {
+            const tbody = document.getElementById('memberTableBody');
+            tbody.innerHTML = '';
+
+            membersList.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-slate-900">${m.name}</td>
+                    <td class="p-3 font-mono text-xs text-slate-600">${m.nik}</td>
+                    <td class="p-3 text-xs">${m.phone}</td>
+                    <td class="p-3 text-xs">${m.rw} / ${m.rt}</td>
+                    <td class="p-3"><span class="text-xs font-bold uppercase px-2 py-0.5 rounded bg-brand-100 text-brand-800">${m.role}</span></td>
+                    <td class="p-3 text-right space-x-1">
+                        <button onclick="openModalEditMember(${m.id})" title="Edit Data Anggota" class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded font-semibold transition">
+                            Edit
+                        </button>
+                        <button onclick="switchActiveUser(${m.id})" class="text-xs bg-slate-800 text-white px-2.5 py-1 rounded font-semibold hover:bg-slate-700 transition">
+                            Gunakan Akun Ini
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- FUNGSIONALITAS EDIT ANGGOTA (NEW V2.3) ---
+        function openModalEditMember(id) {
+            const member = membersList.find(m => m.id === id);
+            if (!member) return;
+
+            document.getElementById('editMemberId').value = member.id;
+            document.getElementById('editName').value = member.name;
+            document.getElementById('editID').value = member.nik;
+            document.getElementById('editPhone').value = member.phone;
+            document.getElementById('editRW').value = member.rw;
+            document.getElementById('editRT').value = member.rt;
+            document.getElementById('editRole').value = member.role;
+
+            document.getElementById('modalEditMember').classList.remove('hidden');
+        }
+
+        function closeModalEditMember() {
+            document.getElementById('modalEditMember').classList.add('hidden');
+        }
+
+        function handleEditMember(e) {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('editMemberId').value);
+            const member = membersList.find(m => m.id === id);
+
+            if (!member) return;
+
+            member.name = document.getElementById('editName').value;
+            member.nik = document.getElementById('editID').value;
+            member.phone = document.getElementById('editPhone').value;
+            member.rw = document.getElementById('editRW').value;
+            member.rt = document.getElementById('editRT').value;
+            member.role = document.getElementById('editRole').value;
+
+            // Jika pengguna aktif yang di-edit, perbarui status header
+            if (currentUser.id === id) {
+                currentUser = member;
+                updateUserUI();
+            }
+
+            saveData();
+            renderMemberTab();
+            closeModalEditMember();
+
+            alert(`Data anggota "${member.name}" berhasil diperbarui!`);
+        }
+
+        function switchActiveUser(id) {
+            const m = membersList.find(x => x.id === id);
+            if (m) {
+                currentUser = m;
+                updateUserUI();
+                alert(`Akun aktif diganti ke: ${m.name} (${m.role.toUpperCase()})`);
+            }
+        }
+
+        // --- FILTER & TABS ---
+        function applyFilters() {
+            const rw = document.getElementById('filterRW').value;
+            const status = document.getElementById('filterStatus').value;
+
+            const filtered = cleaningAreas.filter(item => {
+                const matchRW = rw === 'ALL' || item.rw === rw;
+                const matchStatus = status === 'ALL' || item.status === status;
+                return matchRW && matchStatus;
+            });
+
+            renderMapMarkers(filtered);
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            const titles = {
+                'dashboard': ['Dashboard Utama & Peta Kebersihan', 'Pemantauan real-time status kebersihan wilayah Desa Sukamaju.'],
+                'areas': ['Manajemen Titik & Barcode QR Wilayah', 'Kelola barcode lokasi fisik dan daftar lengkap titik kebersihan.'],
+                'schedules': ['Penjadwalan Petugas Kebersihan', 'Alokasi tim kerja otomatis dan manual harian.'],
+                'verification': ['Verifikasi Bukti Foto Pembersihan', 'Validasi bukti fisik foto Sebelum vs Sesudah oleh RT/RW.'],
+                'members': ['Manajemen Anggota & Petugas', 'Pendaftaran akun baru dan status keanggotaan tim kebersihan.']
+            };
+
+            document.getElementById('viewTitle').innerText = titles[tabId][0];
+            document.getElementById('viewSubtitle').innerText = titles[tabId][1];
+
+            if(tabId === 'dashboard') {
+                setTimeout(() => map.invalidateSize(), 200);
+            }
+        }
+
+        function openModalAddArea() { document.getElementById('modalAddArea').classList.remove('hidden'); }
+        function closeModalAddArea() { document.getElementById('modalAddArea').classList.add('hidden'); }
+
+        function handleFormAddArea(e) {
+            e.preventDefault();
+            const rw = document.getElementById('inputRW').value;
+            const qrCodeGenerated = `QR-DESA-${String(cleaningAreas.length + 1).padStart(3, '0')}`;
+
+            const newArea = {
+                id: Date.now(),
+                qrCode: qrCodeGenerated,
+                name: document.getElementById('inputName').value,
+                rw: rw,
+                rt: document.getElementById('inputRT').value,
+                category: document.getElementById('inputCategory').value,
+                priority: document.getElementById('inputPriority').value,
+                status: 'merah',
+                lat: parseFloat(document.getElementById('inputLat').value),
+                lng: parseFloat(document.getElementById('inputLng').value),
+                desc: document.getElementById('inputDesc').value,
+                imgBefore: "",
+                imgAfter: "",
+                reportedBy: ""
+            };
+
+            cleaningAreas.unshift(newArea);
+            saveData();
+            renderDashboard();
+            renderMapMarkers(cleaningAreas);
+            closeModalAddArea();
+            alert(`Titik kebersihan baru berhasil ditambahkan!\n\nBarcode QR Otomatis Dibuat: [${qrCodeGenerated}]`);
+        }
+
+        function runAutoScheduler() {
+            let assignedCount = 0;
+            cleaningAreas.forEach(area => {
+                if (area.status === 'merah') {
+                    area.status = 'kuning';
+                    assignedCount++;
+                }
+            });
+
+            saveData();
+            renderDashboard();
+            renderMapMarkers(cleaningAreas);
+            renderScheduleTab();
+            alert(`Auto-Scheduler Engine Berhasil!\n\n${assignedCount} Lokasi berprioritas tinggi otomatis dialokasikan ke Tim Petugas aktif.`);
+        }
+
+        function renderScheduleTab() {
+            const list = document.getElementById('scheduleList');
+            list.innerHTML = '';
+
+            const scheduledItems = cleaningAreas.filter(a => a.status === 'kuning' || a.status === 'merah');
+            if(scheduledItems.length === 0) {
+                list.innerHTML = '<p class="text-xs text-slate-500 italic p-4">Tidak ada jadwal tertunda.</p>';
+                return;
+            }
+
+            scheduledItems.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "p-4 border rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-50 gap-3";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center space-x-2 mb-1">
+                            <span class="custom-badge badge-${item.status}">${item.status.toUpperCase()}</span>
+                            <span class="font-mono text-xs font-bold text-slate-600 bg-white px-2 py-0.5 rounded border">${item.qrCode}</span>
+                        </div>
+                        <h5 class="font-bold text-slate-900 text-sm">${item.name}</h5>
+                        <p class="text-xs text-slate-500">${item.rw} / ${item.rt} | Durasi Est: 60 Menit</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="openUploadModalForId(${item.id})" class="text-xs bg-brand-600 text-white px-3 py-1.5 rounded font-bold flex items-center space-x-1">
+                            <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                            <span>Upload Bukti Foto</span>
+                        </button>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function renderVerificationTab() {
+            const container = document.getElementById('verificationCardsContainer');
+            container.innerHTML = '';
+
+            const pendingVerification = cleaningAreas.filter(a => a.status === 'kuning' || (a.imgBefore && a.imgAfter));
+
+            if(pendingVerification.length === 0) {
+                container.innerHTML = '<p class="text-sm text-slate-500 italic col-span-2">Tidak ada laporan bukti foto yang menunggu verifikasi saat ini.</p>';
+                return;
+            }
+
+            pendingVerification.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "p-5 border border-slate-200 rounded-xl bg-slate-50 space-y-3 shadow-sm";
+                card.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="font-mono text-[10px] font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">${item.qrCode}</span>
+                            <h4 class="font-bold text-slate-900 text-base mt-1">${item.name}</h4>
+                        </div>
+                        <span class="text-xs font-bold text-slate-600 bg-white px-2.5 py-1 rounded border">${item.rw}</span>
+                    </div>
+
+                    <p class="text-xs text-slate-600">Pelapor: <b>${item.reportedBy || 'Petugas Kebersihan'}</b></p>
+                    
+                    <div class="grid grid-cols-2 gap-3 text-center text-xs">
+                        <div class="p-2 bg-white rounded-lg border border-slate-200">
+                            <span class="block font-bold text-slate-700 mb-1">Sebelum</span>
+                            ${item.imgBefore ? `<img src="${item.imgBefore}" class="h-32 w-full object-cover rounded border">` : `<div class="h-32 bg-red-50 rounded flex items-center justify-center text-red-500 text-xs border border-red-200 font-semibold">Belum Ada Foto</div>`}
+                        </div>
+                        <div class="p-2 bg-white rounded-lg border border-slate-200">
+                            <span class="block font-bold text-slate-700 mb-1">Sesudah</span>
+                            ${item.imgAfter ? `<img src="${item.imgAfter}" class="h-32 w-full object-cover rounded border">` : `<div class="h-32 bg-emerald-50 rounded flex items-center justify-center text-emerald-600 text-xs border border-emerald-200 font-semibold">Belum Ada Foto</div>`}
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex space-x-2">
+                        <button onclick="verifyTask(${item.id}, true)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-2 rounded-lg font-bold">Setujui (Set Hijau)</button>
+                        <button onclick="verifyTask(${item.id}, false)" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-2 rounded-lg font-bold">Tolak (Re-clean)</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function verifyTask(id, approved) {
+            const item = cleaningAreas.find(a => a.id === id);
+            if (!item) return;
+
+            if (approved) {
+                item.status = 'hijau';
+                alert(`Pekerjaan di [${item.name}] DISETUJUI oleh ${currentUser.name}. Indeks kebersihan desa meningkat!`);
+            } else {
+                item.status = 'merah';
+                alert(`Pekerjaan di [${item.name}] DITOLAK dan dikembalikan ke status MERAH untuk pembersihan ulang.`);
+            }
+
+            saveData();
+            renderDashboard();
+            renderMapMarkers(cleaningAreas);
+            renderScheduleTab();
+            renderVerificationTab();
+        }
+    </script>
+</body>
+</html>
